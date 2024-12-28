@@ -1,6 +1,4 @@
-use anyhow::Result;
-use screenshots::Screen;
-use std::path::Path;
+use screenshots::{display_info::DisplayInfo, image::RgbaImage, Screen};
 use std::time::Instant;
 
 struct ScreenCapture {
@@ -12,64 +10,46 @@ impl ScreenCapture {
         Self { screen }
     }
 
-    fn from_point(x: i32, y: i32) -> Result<Self> {
-        Ok(Self {
-            screen: Screen::from_point(x, y)?,
-        })
+    fn from_point(x: i32, y: i32) -> Option<Self> {
+        Screen::from_point(x, y).ok().map(|screen| Self { screen })
     }
 
-    fn capture_full(&self) -> Result<Vec<u8>> {
-        let image = self.screen.capture()?;
-        Ok(image.into_raw())
+    fn capture(&self) -> Option<RgbaImage> {
+        self.screen.capture().ok()
     }
 
-    fn capture_area(&self, x: i32, y: i32, width: u32, height: u32) -> Result<Vec<u8>> {
-        let image = self.screen.capture_area(x, y, width, height)?;
-        Ok(image.into_raw())
+    fn capture_area(&self, x: i32, y: i32, width: u32, height: u32) -> Option<RgbaImage> {
+        self.screen.capture_area(x, y, width, height).ok()
     }
 
-    fn save_capture(&self, image: Vec<u8>, path: impl AsRef<Path>) -> Result<()> {
-        std::fs::write(path, image)?;
-        Ok(())
-    }
-
-    fn display_id(&self) -> u32 {
-        self.screen.display_info.id
+    fn display_info(&self) -> &DisplayInfo {
+        &self.screen.display_info
     }
 }
 
 fn main() {
     let start = Instant::now();
+    let screens = Screen::all().unwrap();
 
-    if let Ok(screens) = Screen::all() {
-        for screen in screens {
-            println!("Capturing screen: {:?}", screen);
-            let capturer = ScreenCapture::from_screen(screen);
+    for screen in screens {
+        println!("capturer {screen:?}");
+        let capturer = ScreenCapture::from_screen(screen);
 
-            // Capture and save full screen
-            if let Ok(image) = capturer.capture_full() {
-                let _ =
-                    capturer.save_capture(image, format!("target/{}.png", capturer.display_id()));
-            }
+        let mut image = capturer.capture().unwrap();
+        image
+            .save(format!("target/{}.png", capturer.display_info().id))
+            .unwrap();
 
-            // Capture and save area
-            if let Ok(image) = capturer.capture_area(300, 300, 300, 300) {
-                let _ =
-                    capturer.save_capture(image, format!("target/{}-2.png", capturer.display_id()));
-            }
-        }
+        image = capturer.capture_area(300, 300, 300, 300).unwrap();
+        image
+            .save(format!("target/{}-2.png", capturer.display_info().id))
+            .unwrap();
     }
 
-    // Capture from specific point
-    if let Ok(capturer) = ScreenCapture::from_point(100, 100) {
-        println!(
-            "Capturing from point with display id: {}",
-            capturer.display_id()
-        );
-        if let Ok(image) = capturer.capture_area(300, 300, 300, 300) {
-            let _ = capturer.save_capture(image, "target/capture_display_with_point.png");
-        }
-    }
+    let capturer = ScreenCapture::from_point(100, 100).unwrap();
+    println!("capturer {:?}", capturer.screen);
 
+    let image = capturer.capture_area(300, 300, 300, 300).unwrap();
+    image.save("target/capture_display_with_point.png").unwrap();
     println!("Time elapsed: {:?}", start.elapsed());
 }
