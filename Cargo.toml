@@ -1,0 +1,8 @@
+[package]
+name = "desktop_screen_shot"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+screenshots = "0.8.10"
+anyhow = "1.0"
